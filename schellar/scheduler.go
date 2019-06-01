@@ -18,7 +18,7 @@ func startScheduler() {
 }
 
 func launchSchedules() error {
-	logrus.Debugf("launchSchedules sync Go routines with schedules from database")
+	logrus.Debugf("Manage timers")
 
 	sc := mongoSession.Copy()
 	defer sc.Close()
@@ -64,7 +64,6 @@ func launchSchedules() error {
 			}
 		}
 		if !isActive {
-			logrus.Infof("")
 			logrus.Infof("Stopping timer for schedule id %s", scheduleID)
 			cronJob.Stop()
 		}
@@ -74,7 +73,7 @@ func launchSchedules() error {
 }
 
 func launchSchedule(schedule Schedule) error {
-	logrus.Debugf("schedule=%s", schedule)
+	logrus.Debugf("launchSchedule=%v", schedule)
 
 	scheduleID := schedule.ID.Hex()
 	c := cron.New()
@@ -142,6 +141,7 @@ func checkRunningWorkflows() {
 }
 
 func checkAndUpdateScheduleRunStatus(scheduleRun ScheduleRun) error {
+	logrus.Debugf("checkAndUpdateScheduleRunStatus id=%s wfid=%s", scheduleRun.ID, scheduleRun.WorkflowID)
 	wf, err := getWorkflowRun(scheduleRun.WorkflowID)
 	if err != nil {
 		return err
@@ -170,7 +170,6 @@ func checkAndUpdateScheduleRunStatus(scheduleRun ScheduleRun) error {
 		statusMap["lastUpdate"] = time.Now()
 
 		if status == "COMPLETED" {
-
 			logrus.Debugf("Updating input/output context")
 			sch := sc.DB(dbName).C("schedules")
 			var schedule map[string]interface{}
@@ -188,11 +187,7 @@ func checkAndUpdateScheduleRunStatus(scheduleRun ScheduleRun) error {
 					currentContext[k] = v
 				}
 			}
-			err = sch.UpdateId(scheduleRun.ScheduleID, currentContext)
-			if err != nil {
-				return err
-			}
-			logrus.Debugf("Context updated successfully")
+			statusMap["currentContext"] = currentContext
 		}
 		err0 = st.UpdateId(scheduleRun.ScheduleID, statusMap)
 		if err0 != nil {

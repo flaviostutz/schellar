@@ -49,6 +49,24 @@ func launchWorkflow(scheduleID string) (string, error) {
 	return string(data), nil
 }
 
+func getWorkflow(name string, version string) (map[string]interface{}, error) {
+	logrus.Debugf("getWorkflow %s", name)
+	resp, data, err := getHTTP(fmt.Sprintf("%s/metadata/workflow/{%s}?version=%s", name, version))
+	if err != nil {
+		return nil, fmt.Errorf("GET /metadata/workflow/name failed. err=%s", err)
+	}
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("Couldn't get workflow info. name=%s", name)
+	}
+	var wfdata map[string]interface{}
+	err = json.Unmarshal(data, &wfdata)
+	if err != nil {
+		logrus.Errorf("Error parsing json. err=%s", err)
+		return nil, err
+	}
+	return wfdata, nil
+}
+
 func getWorkflowRun(workflowID string) (map[string]interface{}, error) {
 	logrus.Debugf("getWorkflowRun %s", workflowID)
 	resp, data, err := getHTTP(fmt.Sprintf("%s/workflow/%s?includeTasks=false", conductorURL, workflowID))

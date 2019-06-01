@@ -40,7 +40,7 @@ func startRestAPI() error {
 }
 
 func listScheduleRun(w http.ResponseWriter, r *http.Request) {
-	logrus.Debugf("listScheduleRun r=%s", r)
+	logrus.Debugf("listScheduleRun r=%v", r)
 	id := r.URL.Query().Get("id")
 
 	sc := mongoSession.Copy()
@@ -67,7 +67,7 @@ func listScheduleRun(w http.ResponseWriter, r *http.Request) {
 }
 
 func createSchedule(w http.ResponseWriter, r *http.Request) {
-	logrus.Debugf("createSchedule r=%s", r)
+	logrus.Debugf("createSchedule r=%v", r)
 
 	decoder := json.NewDecoder(r.Body)
 	// schedule := make(map[string]interface{})
@@ -75,6 +75,12 @@ func createSchedule(w http.ResponseWriter, r *http.Request) {
 	err := decoder.Decode(&schedule)
 	if err != nil {
 		writeResponse(w, http.StatusBadRequest, fmt.Sprintf("Error handling post results. err=%s", err.Error()))
+		return
+	}
+
+	_, err1 := getWorkflow(schedule.WorkflowVersion, schedule.WorkflowVersion)
+	if err1 != nil {
+		writeResponse(w, http.StatusBadRequest, fmt.Sprintf("Workflow '%s' %s doesn't exist in Conductor", schedule.WorkflowName, schedule.WorkflowVersion))
 		return
 	}
 
@@ -95,7 +101,7 @@ func createSchedule(w http.ResponseWriter, r *http.Request) {
 }
 
 func updateSchedule(w http.ResponseWriter, r *http.Request) {
-	logrus.Debugf("updateSchedule r=%s", r)
+	logrus.Debugf("updateSchedule r=%v", r)
 	id := r.URL.Query().Get("id")
 
 	decoder := json.NewDecoder(r.Body)
@@ -119,7 +125,7 @@ func updateSchedule(w http.ResponseWriter, r *http.Request) {
 }
 
 func listSchedules(w http.ResponseWriter, r *http.Request) {
-	logrus.Debugf("listSchedules r=%s", r)
+	logrus.Debugf("listSchedules r=%v", r)
 
 	sc := mongoSession.Copy()
 	defer sc.Close()
@@ -134,7 +140,7 @@ func listSchedules(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	logrus.Debugf("Schedules=%s", schedules)
+	logrus.Debugf("Schedules=%v", schedules)
 	b, err0 := json.Marshal(schedules)
 	if err0 != nil {
 		writeResponse(w, http.StatusInternalServerError, fmt.Sprintf("Error listing schedules. err=%s", err.Error()))
@@ -145,7 +151,7 @@ func listSchedules(w http.ResponseWriter, r *http.Request) {
 }
 
 func getSchedule(w http.ResponseWriter, r *http.Request) {
-	logrus.Debugf("getSchedule r=%s", r)
+	logrus.Debugf("getSchedule r=%v", r)
 	id := r.URL.Query().Get("id")
 
 	sc := mongoSession.Copy()
@@ -171,7 +177,7 @@ func getSchedule(w http.ResponseWriter, r *http.Request) {
 }
 
 func deleteSchedule(w http.ResponseWriter, r *http.Request) {
-	logrus.Debugf("deleteSchedule r=%s", r)
+	logrus.Debugf("deleteSchedule r=%v", r)
 	id := r.URL.Query().Get("id")
 
 	sc := mongoSession.Copy()
