@@ -1,0 +1,21 @@
+[
+    {
+        "name": "encode",
+        "retryCount": 3,
+
+        "timeoutSeconds": 360,
+        "inputKeys": [
+            "fileLocation"
+        ],
+        "outputKeys": [
+            "encodeLocation"
+        ],
+        "timeoutPolicy": "TIME_OUT_WF",
+        "retryLogic": "FIXED",
+        "retryDelaySeconds": 30,
+        "responseTimeoutSeconds": 120,
+        "concurrentExecLimit": 100,
+        "rateLimitFrequencyInSeconds": 60,
+        "rateLimitPerFrequency": 50
+    }
+]

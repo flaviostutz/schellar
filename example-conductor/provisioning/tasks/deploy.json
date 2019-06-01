@@ -1,0 +1,21 @@
+[
+    {
+        "name": "deploy",
+        "retryCount": 3,
+
+        "timeoutSeconds": 3600,
+        "inputKeys": [
+            "fileLocation"
+        ],
+        "outputKeys": [
+            "location"
+        ],
+        "timeoutPolicy": "TIME_OUT_WF",
+        "retryLogic": "FIXED",
+        "retryDelaySeconds": 30,
+        "responseTimeoutSeconds": 1200,
+        "concurrentExecLimit": 100,
+        "rateLimitFrequencyInSeconds": 60,
+        "rateLimitPerFrequency": 50
+    }
+]

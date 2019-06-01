@@ -1,2 +1,4 @@
 # schellar
-Schellar is a scheduler tool for invoking REST services from time to time
+Schellar is a scheduler tool for invoking Conductor workflows from time to time
+
+

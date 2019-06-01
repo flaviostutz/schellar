@@ -1,0 +1,29 @@
+{
+    "name": "encode_and_deploy",
+    "description": "Encodes a file and deploys to CDN",
+    "version": 1,
+    "tasks": [{
+            "name": "encode",
+            "taskReferenceName": "encode",
+            "type": "SIMPLE",
+            "inputParameters": {
+                "fileLocation": "${workflow.input.fileLocation}"
+            }
+        },
+        {
+            "name": "deploy",
+            "taskReferenceName": "deploy",
+            "type": "SIMPLE",
+            "inputParameters": {
+                "fileLocation": "${encode.output.encodeLocation}"
+            }
+        }
+    ],
+    "outputParameters": {
+        "cdn_url": "${deploy.output.location}"
+    },
+    "failureWorkflow": "cleanup_encode_resources",
+    "restartable": true,
+    "workflowStatusListenerEnabled": true,
+    "schemaVersion": 2
+}
