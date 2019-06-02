@@ -21,30 +21,29 @@ var (
 
 //Schedule struct
 type Schedule struct {
-	ID                  bson.ObjectId          `json:"id",omitempty bson:_id`
-	Name                string                 `json:"name",omitempty`
-	Enabled             bool                   `json:"enabled",omitempty`
-	WorkflowName        string                 `json:"workflowName",omitempty`
-	WorkflowVersion     string                 `json:"workflowVersion",omitempty`
-	InitialContext      map[string]interface{} `json:"initialContext",omitempty`
-	CurrentContext      map[string]interface{} `json:"currentContext",omitempty`
-	CronString          string                 `json:"cronString",omitempty`
-	CheckWarningSeconds int                    `json:"checkWarningSeconds",omitempty`
-	FromDate            time.Time              `json:"fromDate",omitempty`
-	ToDate              time.Time              `json:"toDate",omitempty`
-	LastUpdate          time.Time              `json:"lastUpdate",omitempty`
+	ID                  bson.ObjectId          `json:"id,omitempty" bson:"_id"`
+	Name                string                 `json:"name,omitempty"`
+	Enabled             bool                   `json:"enabled,omitempty"`
+	WorkflowName        string                 `json:"workflowName,omitempty"`
+	WorkflowVersion     string                 `json:"workflowVersion,omitempty"`
+	WorkflowContext     map[string]interface{} `json:"workflowContext,omitempty"`
+	CronString          string                 `json:"cronString,omitempty"`
+	CheckWarningSeconds int                    `json:"checkWarningSeconds,omitempty"`
+	FromDate            *time.Time             `json:"fromDate,omitempty"`
+	ToDate              *time.Time             `json:"toDate,omitempty"`
+	LastUpdate          time.Time              `json:"lastUpdate,omitempty"`
 }
 
 //ScheduleRun struct
 type ScheduleRun struct {
-	ID              bson.ObjectId          `json:"id",omitempty bson:_id`
-	ScheduleID      string                 `json:"scheduleId",omitempty`
-	Status          string                 `json:"status",omitempty`
-	WorkflowID      string                 `json:"workflowId",omitempty`
-	StartDate       time.Time              `json:"startDate",omitempty`
-	FinishDate      time.Time              `json:"finishDate",omitempty`
-	WorkflowDetails map[string]interface{} `json:"details",omitempty`
-	LastUpdate      time.Time              `json:"lastUpdate",omitempty`
+	ID              bson.ObjectId          `json:"id,omitempty" bson:"_id"`
+	ScheduleID      string                 `json:"scheduleId,omitempty"`
+	Status          string                 `json:"status,omitempty"`
+	WorkflowID      string                 `json:"workflowId,omitempty"`
+	StartDate       time.Time              `json:"startDate,omitempty"`
+	FinishDate      time.Time              `json:"finishDate,omitempty"`
+	WorkflowDetails map[string]interface{} `json:"details,omitempty"`
+	LastUpdate      time.Time              `json:"lastUpdate,omitempty"`
 }
 
 func main() {
@@ -114,6 +113,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	startScheduler()
+	err := startScheduler()
+	if err != nil {
+		logrus.Errorf("Error during scheduler startup. err=%s", err)
+		os.Exit(1)
+	}
 	startRestAPI()
 }

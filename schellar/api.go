@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"encoding/json"
 
@@ -77,27 +78,53 @@ func createSchedule(w http.ResponseWriter, r *http.Request) {
 		writeResponse(w, http.StatusBadRequest, fmt.Sprintf("Error handling post results. err=%s", err.Error()))
 		return
 	}
-
-	_, err1 := getWorkflow(schedule.WorkflowVersion, schedule.WorkflowVersion)
-	if err1 != nil {
-		writeResponse(w, http.StatusBadRequest, fmt.Sprintf("Workflow '%s' %s doesn't exist in Conductor", schedule.WorkflowName, schedule.WorkflowVersion))
+	if schedule.Name == "" {
+		writeResponse(w, http.StatusBadRequest, "'name' is required")
 		return
 	}
+	if schedule.WorkflowName == "" {
+		writeResponse(w, http.StatusBadRequest, "'workflowName' is required")
+		return
+	}
+	if schedule.CronString == "" {
+		writeResponse(w, http.StatusBadRequest, "'cronString' is required")
+		return
+	}
+	if schedule.WorkflowVersion == "" {
+		schedule.WorkflowVersion = "1"
+	}
+	if !schedule.Enabled {
+		schedule.Enabled = true
+	}
+	if schedule.CheckWarningSeconds == 0 {
+		schedule.CheckWarningSeconds = 3600
+	}
+	schedule.LastUpdate = time.Now()
+
+	// _, err1 := getWorkflow(schedule.WorkflowName, schedule.WorkflowVersion)
+	// if err1 != nil {
+	// 	writeResponse(w, http.StatusBadRequest, fmt.Sprintf("Workflow '%s' %s doesn't exist in Conductor", schedule.WorkflowName, schedule.WorkflowVersion))
+	// 	return
+	// }
+	// logrus.Debugf("Workflow %s exists in Conductor", schedule.WorkflowName)
 
 	sc := mongoSession.Copy()
 	defer sc.Close()
 	st := sc.DB(dbName).C("schedules")
-	schedule.CurrentContext = schedule.InitialContext
-	ns, err0 := st.Upsert(bson.M{"nonsense": -1}, schedule)
+	// schedule.CurrentContext = schedule.InitialContext
+	logrus.Debugf("Saving schedule for workflow %s", schedule.WorkflowName)
+	schedule.ID = bson.NewObjectId()
+	err0 := st.Insert(schedule)
 	if err0 != nil {
-		writeResponse(w, http.StatusInternalServerError, fmt.Sprintf("Error storing schedule. err=%s", err.Error()))
+		writeResponse(w, http.StatusInternalServerError, fmt.Sprintf("Error storing schedule. err=%s", err0.Error()))
 		return
 	}
+	prepareTimers()
+	logrus.Debugf("Sending response")
 	w.Header().Set("Content-Type", "plain/text")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusCreated)
-	uid := ns.UpsertedId.(bson.ObjectId)
-	w.Write([]byte(uid.Hex()))
+	w.Write([]byte(schedule.ID.Hex()))
 }
 
 func updateSchedule(w http.ResponseWriter, r *http.Request) {
@@ -121,6 +148,7 @@ func updateSchedule(w http.ResponseWriter, r *http.Request) {
 		writeResponse(w, http.StatusInternalServerError, fmt.Sprintf("Error updating schedule. err=%s", err.Error()))
 		return
 	}
+	prepareTimers()
 	writeResponse(w, http.StatusCreated, fmt.Sprintf("Schedule updated successfully"))
 }
 
@@ -189,6 +217,7 @@ func deleteSchedule(w http.ResponseWriter, r *http.Request) {
 		writeResponse(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting schedule. err=%s", err.Error()))
 		return
 	}
+	prepareTimers()
 	writeResponse(w, http.StatusOK, fmt.Sprintf("Deleted schedule successfully. id=%s", id))
 }
 

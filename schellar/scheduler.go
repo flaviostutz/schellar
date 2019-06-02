@@ -9,45 +9,44 @@ import (
 )
 
 var (
-	scheduledRoutines map[string]*cron.Cron
+	scheduledRoutines = make(map[string]*cron.Cron)
 )
 
-func startScheduler() {
-	launchSchedules()
+func startScheduler() error {
+	err := prepareTimers()
+	if err != nil {
+		return err
+	}
 	go checkRunningWorkflows()
+	return nil
 }
 
-func launchSchedules() error {
-	logrus.Debugf("Manage timers")
+func prepareTimers() error {
+	logrus.Debugf("Refreshing timers according to active schedules")
 
 	sc := mongoSession.Copy()
 	defer sc.Close()
 	st := sc.DB(dbName).C("schedules")
 
 	// var schedules []map[string]interface{}
-	var schedules []Schedule
-	err := st.Find(nil).Select(bson.M{"active": true}).All(&schedules)
+	var activeSchedules []Schedule
+	err := st.Find(bson.M{"enabled": true}).All(&activeSchedules)
 	if err != nil {
 		return err
 	}
 
-	activeSchedules := make(map[string]Schedule)
-	for _, schedule := range schedules {
-		activeSchedules[schedule.ID.Hex()] = schedule
-	}
-
 	//activate go routines for schedules that weren't activated yet
-	for idActive, schedule := range activeSchedules {
+	for _, activeSchedule := range activeSchedules {
 		isScheduled := false
 		for idRoutine := range scheduledRoutines {
-			if idActive == idRoutine {
+			if activeSchedule.ID.Hex() == idRoutine {
 				isScheduled = true
-				break
+				// break
 			}
 		}
 		if !isScheduled {
-			logrus.Infof("Starting timer for schedule '%s'", schedule.Name)
-			err := launchSchedule(schedule)
+			logrus.Infof("Starting timer for schedule '%s' (%s)", activeSchedule.ID.Hex(), activeSchedule.Name)
+			err := launchSchedule(activeSchedule.ID.Hex())
 			if err != nil {
 				return err
 			}
@@ -57,8 +56,8 @@ func launchSchedules() error {
 	//remove go routines that are not currenctly active
 	for scheduleID, cronJob := range scheduledRoutines {
 		isActive := false
-		for activeID := range activeSchedules {
-			if scheduleID == activeID {
+		for _, activeSchedule := range activeSchedules {
+			if scheduleID == activeSchedule.ID.Hex() {
 				isActive = true
 				break
 			}
@@ -72,44 +71,89 @@ func launchSchedules() error {
 	return nil
 }
 
-func launchSchedule(schedule Schedule) error {
-	logrus.Debugf("launchSchedule=%v", schedule)
+func launchSchedule(scheduleID string) error {
+	logrus.Debugf("launchSchedule=%s", scheduleID)
 
-	scheduleID := schedule.ID.Hex()
+	sc := mongoSession.Copy()
+	defer sc.Close()
+
+	var schedule0 Schedule
+	st := sc.DB(dbName).C("schedules")
+
+	// if true {
+	// 	var tests []Schedule
+	// 	err0 := st.Find(nil).All(&tests)
+	// 	if err0 != nil {
+	// 		logrus.Errorf(">>>>> ERR111 %s", err0)
+	// 	}
+	// 	logrus.Infof(">>>>> TEST %v", tests)
+	// }
+
+	fid := bson.ObjectIdHex(scheduleID)
+	err := st.FindId(fid).One(&schedule0)
+	if err != nil {
+		return err
+	}
+
 	c := cron.New()
-	//trigger new workflows
-	c.AddFunc(schedule.CronString, func() {
-		logrus.Infof("%s Launching new workflow for schedule '%s'", time.Now(), scheduleID)
-		startTime := time.Now()
-		workflowID, err := launchWorkflow(scheduleID)
+	c.AddFunc(schedule0.CronString, func() {
+		logrus.Debugf("Processing timer trigger for schedule %s", scheduleID)
+		sc := mongoSession.Copy()
+		defer sc.Close()
+
+		var schedule Schedule
+		st := sc.DB(dbName).C("schedules")
+		fid := bson.ObjectIdHex(scheduleID)
+		err := st.FindId(fid).One(&schedule)
 		if err != nil {
-			logrus.Errorf("Error launching Workflow err=%s", err)
+			logrus.Errorf("Couldn't get schedule %s. err=%s", scheduleID, err)
 			return
 		}
 
-		logrus.Debugf("Saving workflow run %s", workflowID)
-		var scheduleRun ScheduleRun
-		scheduleRun.WorkflowID = workflowID
-		scheduleRun.StartDate = startTime
-		scheduleRun.Status = "RUNNING"
-		scheduleRun.LastUpdate = time.Now()
-		runID, err0 := saveScheduleRun(scheduleRun)
-		if err0 != nil {
-			logrus.Errorf("Error saving Schedule Run err=%s", err0)
+		isBefore := false
+		if schedule.ToDate == nil || time.Now().Before(*schedule.ToDate) {
+			isBefore = true
 		}
-		logrus.Debugf("Schedule Run saved. id=%s", runID)
+		isAfter := false
+		if schedule.FromDate == nil || time.Now().After(*schedule.FromDate) {
+			isAfter = true
+		}
+		if isBefore && isAfter {
+			logrus.Infof("%s Launching new workflow for schedule '%s'", time.Now(), scheduleID)
+			startTime := time.Now()
+			workflowID, err := launchWorkflow(scheduleID)
+			if err != nil {
+				logrus.Errorf("Error launching Workflow err=%s", err)
+				return
+			}
 
-		logrus.Debugf("Updating Schedule status. id=%s. status=%s", scheduleRun.ScheduleID, "RUNNING")
-		sc := mongoSession.Copy()
-		defer sc.Close()
-		sch := sc.DB(dbName).C("runs")
-		statusMap := make(map[string]interface{})
-		statusMap["status"] = "RUNNING"
-		statusMap["lastUpdate"] = time.Now()
-		err0 = sch.UpdateId(scheduleRun.ScheduleID, statusMap)
-		if err0 != nil {
-			logrus.Errorf("Error saving Schedule status err=%s", err0)
+			logrus.Debugf("Saving workflow run %s", workflowID)
+			var scheduleRun ScheduleRun
+			scheduleRun.WorkflowID = workflowID
+			scheduleRun.StartDate = startTime
+			scheduleRun.Status = "RUNNING"
+			scheduleRun.LastUpdate = time.Now()
+			runID, err0 := saveScheduleRun(scheduleRun)
+			if err0 != nil {
+				logrus.Errorf("Error saving Schedule Run err=%s", err0)
+			}
+			logrus.Debugf("Schedule Run saved. id=%s", runID)
+
+			logrus.Debugf("Updating Schedule status. id=%s. status=%s", scheduleRun.ScheduleID, "RUNNING")
+			statusMap := make(map[string]interface{})
+			statusMap["status"] = "RUNNING"
+			statusMap["lastUpdate"] = time.Now()
+
+			sr := sc.DB(dbName).C("runs")
+			err0 = sr.UpdateId(scheduleRun.ScheduleID, statusMap)
+			if err0 != nil {
+				logrus.Errorf("Error saving Schedule status err=%s", err0)
+			}
+
+		} else {
+			logrus.Debugf("Schedule %s active, but not within activation date", scheduleID)
 		}
+
 	})
 	scheduledRoutines[scheduleID] = c
 	go c.Start()
@@ -117,13 +161,14 @@ func launchSchedule(schedule Schedule) error {
 }
 
 func checkRunningWorkflows() {
-	logrus.Debugf("Starting routine that will check for running workflows status")
+	logrus.Debugf("Starting to check running workflow status")
 	for {
+		logrus.Debugf("Checking running workflows...")
 		sc := mongoSession.Copy()
 		sch := sc.DB(dbName).C("runs")
 
 		scheduleRuns := make([]ScheduleRun, 0)
-		err0 := sch.Find(nil).Select(bson.M{"status": "RUNNING"}).All(&scheduleRuns)
+		err0 := sch.Find(bson.M{"status": "RUNNING"}).All(&scheduleRuns)
 		if err0 != nil {
 			logrus.Errorf("Error listing RUNNING runs. err=%s", err0)
 		} else {
@@ -173,11 +218,12 @@ func checkAndUpdateScheduleRunStatus(scheduleRun ScheduleRun) error {
 			logrus.Debugf("Updating input/output context")
 			sch := sc.DB(dbName).C("schedules")
 			var schedule map[string]interface{}
-			err := sch.FindId(scheduleRun.ScheduleID).One(&schedule)
+			fid := bson.ObjectIdHex(scheduleRun.ScheduleID)
+			err := sch.FindId(fid).One(&schedule)
 			if err != nil {
 				return err
 			}
-			currentContext, existsCurrent := schedule["currentContext"].(map[string]string)
+			currentContext, existsCurrent := schedule["workflowContext"].(map[string]string)
 			if !existsCurrent {
 				currentContext = make(map[string]string)
 			}
@@ -187,7 +233,7 @@ func checkAndUpdateScheduleRunStatus(scheduleRun ScheduleRun) error {
 					currentContext[k] = v
 				}
 			}
-			statusMap["currentContext"] = currentContext
+			statusMap["workflowContext"] = currentContext
 		}
 		err0 = st.UpdateId(scheduleRun.ScheduleID, statusMap)
 		if err0 != nil {
@@ -214,10 +260,10 @@ func saveScheduleRun(scheduleRun ScheduleRun) (string, error) {
 	defer sc.Close()
 
 	sch := sc.DB(dbName).C("runs")
-	ns, err0 := sch.UpsertId(bson.M{"nonsense": -1}, scheduleRun)
+	scheduleRun.ID = bson.NewObjectId()
+	err0 := sch.Insert(scheduleRun)
 	if err0 != nil {
 		return "", err0
 	}
-	uid := ns.UpsertedId.(bson.ObjectId)
-	return uid.Hex(), nil
+	return scheduleRun.ID.Hex(), nil
 }

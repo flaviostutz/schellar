@@ -6,7 +6,7 @@ services:
     build: .
     image: flaviostutz/schellar
     environment:
-      - CONDUCTOR_API_URL=http://conductor-server:8080/api/
+      - CONDUCTOR_API_URL=http://conductor-server:8080/api
       - MONGO_ADDRESS=mongo
       - MONGO_USERNAME=root
       - MONGO_PASSWORD=root
