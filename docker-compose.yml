@@ -10,7 +10,7 @@ services:
       - MONGO_ADDRESS=mongo
       - MONGO_USERNAME=root
       - MONGO_PASSWORD=root
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=info
     ports:
       - 3000:3000
     logging:

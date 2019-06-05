@@ -8,46 +8,36 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	mgo "gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 )
 
 var (
-	conductorURL  string
-	mongoAddress  string
-	mongoUsername string
-	mongoPassword string
-	dbName        = "admin"
+	conductorURL         string
+	mongoAddress         string
+	mongoUsername        string
+	mongoPassword        string
+	dbName               = "admin"
+	checkIntervalSeconds = 10
 )
 
 //Schedule struct
 type Schedule struct {
-	ID                  bson.ObjectId          `json:"id,omitempty" bson:"_id"`
-	Name                string                 `json:"name,omitempty"`
-	Enabled             bool                   `json:"enabled,omitempty"`
-	WorkflowName        string                 `json:"workflowName,omitempty"`
-	WorkflowVersion     string                 `json:"workflowVersion,omitempty"`
-	WorkflowContext     map[string]interface{} `json:"workflowContext,omitempty"`
-	CronString          string                 `json:"cronString,omitempty"`
-	CheckWarningSeconds int                    `json:"checkWarningSeconds,omitempty"`
-	FromDate            *time.Time             `json:"fromDate,omitempty"`
-	ToDate              *time.Time             `json:"toDate,omitempty"`
-	LastUpdate          time.Time              `json:"lastUpdate,omitempty"`
-}
-
-//ScheduleRun struct
-type ScheduleRun struct {
-	ID              bson.ObjectId          `json:"id,omitempty" bson:"_id"`
-	ScheduleID      string                 `json:"scheduleId,omitempty"`
-	Status          string                 `json:"status,omitempty"`
-	WorkflowID      string                 `json:"workflowId,omitempty"`
-	StartDate       time.Time              `json:"startDate,omitempty"`
-	FinishDate      time.Time              `json:"finishDate,omitempty"`
-	WorkflowDetails map[string]interface{} `json:"details,omitempty"`
-	LastUpdate      time.Time              `json:"lastUpdate,omitempty"`
+	Name                string                 `json:"name,omitempty" bson:"name"`
+	Enabled             bool                   `json:"enabled,omitempty" bson:"enabled"`
+	Status              string                 `json:"status,omitempty" bson:"status"`
+	WorkflowName        string                 `json:"workflowName,omitempty" bson:"workflowName"`
+	WorkflowVersion     string                 `json:"workflowVersion,omitempty" bson:"workflowVersion"`
+	WorkflowContext     map[string]interface{} `json:"workflowContext,omitempty" bson:"workflowContext"`
+	CronString          string                 `json:"cronString,omitempty" bson:"cronString"`
+	ParallelRuns        bool                   `json:"parallelRuns,omitempty" bson:"parallelRuns"`
+	CheckWarningSeconds int                    `json:"checkWarningSeconds,omitempty" bson:"checkWarningSeconds"`
+	FromDate            *time.Time             `json:"fromDate,omitempty" bson:"fromDate"`
+	ToDate              *time.Time             `json:"toDate,omitempty" bson:"toDate"`
+	LastUpdate          time.Time              `json:"lastUpdate,omitempty" bson:"lastUpdate"`
 }
 
 func main() {
 	logLevel := flag.String("loglevel", "debug", "debug, info, warning, error")
+	checkInterval0 := flag.Int("check-interval", 10, "Workflow check interval in seconds")
 	conductorURL0 := flag.String("conductor-api-url", "", "Conductor API URL. Example: http://conductor-server:8080/api")
 	mongoAddress0 := flag.String("mongo-address", "", "MongoDB address. Example: 'mongo', or 'mongdb://mongo1:1234/db1,mongo2:1234/db1")
 	mongoUsername0 := flag.String("mongo-username", "root", "MongoDB username")
@@ -83,6 +73,8 @@ func main() {
 
 	mongoUsername = *mongoUsername0
 	mongoPassword = *mongoPassword0
+
+	checkIntervalSeconds = *checkInterval0
 
 	logrus.Info("====Starting Schellar====")
 

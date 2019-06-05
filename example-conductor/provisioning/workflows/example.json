@@ -7,20 +7,12 @@
             "taskReferenceName": "encode",
             "type": "SIMPLE",
             "inputParameters": {
-                "fileLocation": "${workflow.input.fileLocation}"
-            }
-        },
-        {
-            "name": "deploy",
-            "taskReferenceName": "deploy",
-            "type": "SIMPLE",
-            "inputParameters": {
-                "fileLocation": "${encode.output.encodeLocation}"
+                "param1": "${workflow.input.param1}"
             }
         }
     ],
     "outputParameters": {
-        "cdn_url": "${deploy.output.location}"
+        "param1": "${encode.output.param1}"
     },
     "failureWorkflow": "cleanup_encode_resources",
     "restartable": true,

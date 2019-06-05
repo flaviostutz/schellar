@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"encoding/json"
@@ -23,12 +24,9 @@ func startRestAPI() error {
 	router := mux.NewRouter()
 	router.HandleFunc("/schedule", createSchedule).Methods("POST")
 	router.HandleFunc("/schedule", listSchedules).Methods("GET")
-	router.HandleFunc("/schedule/{id}", getSchedule).Methods("GET")
-	router.HandleFunc("/schedule/{id}", deleteSchedule).Methods("DELETE")
-	router.HandleFunc("/schedule/{id}", updateSchedule).Methods("PUT")
-	// router.HandleFunc("/schedule/{id}/run", createScheduleRun).Methods("POST")
-	router.HandleFunc("/schedule/{id}/run", listScheduleRun).Methods("GET")
-	// router.HandleFunc("/schedule/{id}/run/{rid}", updateScheduleRun).Methods("PUT")
+	router.HandleFunc("/schedule/{name}", getSchedule).Methods("GET")
+	router.HandleFunc("/schedule/{name}", deleteSchedule).Methods("DELETE")
+	router.HandleFunc("/schedule/{name}", updateSchedule).Methods("PUT")
 	router.Handle("/metrics", promhttp.Handler())
 	listen := fmt.Sprintf("0.0.0.0:3000")
 	logrus.Infof("Listening at %s", listen)
@@ -38,33 +36,6 @@ func startRestAPI() error {
 		os.Exit(1)
 	}
 	return nil
-}
-
-func listScheduleRun(w http.ResponseWriter, r *http.Request) {
-	logrus.Debugf("listScheduleRun r=%v", r)
-	id := r.URL.Query().Get("id")
-
-	sc := mongoSession.Copy()
-	defer sc.Close()
-	st := sc.DB(dbName).C("runs")
-	// schedules := make([]map[string]interface{}, 0)
-	var scheduleRuns []ScheduleRun
-	err0 := st.Find(nil).Select(bson.M{"scheduleId": id}).All(&scheduleRuns)
-	if err0 != nil {
-		writeResponse(w, http.StatusInternalServerError, fmt.Sprintf("Error listing schedule runs for %s. err=%s", id, err0.Error()))
-		return
-	}
-
-	bschedulesruns, err0 := json.Marshal(scheduleRuns)
-	if err0 != nil {
-		writeResponse(w, http.StatusInternalServerError, fmt.Sprintf("Error listing schedule runs for %s. err=%s", id, err0.Error()))
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(http.StatusOK)
-	w.Write(bschedulesruns)
 }
 
 func createSchedule(w http.ResponseWriter, r *http.Request) {
@@ -90,6 +61,10 @@ func createSchedule(w http.ResponseWriter, r *http.Request) {
 		writeResponse(w, http.StatusBadRequest, "'cronString' is required")
 		return
 	}
+	if len(strings.Split(schedule.CronString, " ")) != 6 {
+		writeResponse(w, http.StatusBadRequest, "'cronString' is invalid. It must have 5 spaces")
+		return
+	}
 	if schedule.WorkflowVersion == "" {
 		schedule.WorkflowVersion = "1"
 	}
@@ -111,12 +86,25 @@ func createSchedule(w http.ResponseWriter, r *http.Request) {
 	sc := mongoSession.Copy()
 	defer sc.Close()
 	st := sc.DB(dbName).C("schedules")
-	// schedule.CurrentContext = schedule.InitialContext
-	logrus.Debugf("Saving schedule for workflow %s", schedule.WorkflowName)
-	schedule.ID = bson.NewObjectId()
+
+	//check duplicate schedule
+	c, err1 := st.Find(bson.M{"name": schedule.Name}).Count()
+	if err1 != nil {
+		writeResponse(w, http.StatusInternalServerError, "Error checking for existing schedule name")
+		logrus.Errorf("Error checking for existing schedule name. err=%s", err1)
+		return
+	}
+	if c > 0 {
+		writeResponse(w, http.StatusBadRequest, fmt.Sprintf("Duplicate schedule name '%s'", schedule.Name))
+		return
+	}
+
+	logrus.Debugf("Saving schedule %s for workflow %s", schedule.Name, schedule.WorkflowName)
+	logrus.Debugf("schedule: %v", schedule)
 	err0 := st.Insert(schedule)
 	if err0 != nil {
-		writeResponse(w, http.StatusInternalServerError, fmt.Sprintf("Error storing schedule. err=%s", err0.Error()))
+		writeResponse(w, http.StatusInternalServerError, "Error storing schedule")
+		logrus.Errorf("Error storing schedule to Mongo. err=%s", err0)
 		return
 	}
 	prepareTimers()
@@ -124,17 +112,15 @@ func createSchedule(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "plain/text")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(schedule.ID.Hex()))
 }
 
 func updateSchedule(w http.ResponseWriter, r *http.Request) {
 	logrus.Debugf("updateSchedule r=%v", r)
-	id := r.URL.Query().Get("id")
+	name := mux.Vars(r)["name"]
 
 	decoder := json.NewDecoder(r.Body)
-	// schedule := make(map[string]interface{})
-	var schedule Schedule
-	err := decoder.Decode(&schedule)
+	schedule2 := make(map[string]interface{})
+	err := decoder.Decode(&schedule2)
 	if err != nil {
 		writeResponse(w, http.StatusBadRequest, fmt.Sprintf("Error updating schedule. err=%s", err.Error()))
 		return
@@ -143,9 +129,22 @@ func updateSchedule(w http.ResponseWriter, r *http.Request) {
 	sc := mongoSession.Copy()
 	defer sc.Close()
 	st := sc.DB(dbName).C("schedules")
-	err = st.UpdateId(id, schedule)
+
+	logrus.Debugf("Updating schedule with %v", schedule2)
+	c, err1 := st.Find(bson.M{"name": name}).Count()
+	if err1 != nil {
+		writeResponse(w, http.StatusInternalServerError, fmt.Sprintf("Error updating schedule"))
+		logrus.Errorf("Couldn't find schedule name %s. err=%s", name, err1)
+		return
+	}
+	if c == 0 {
+		writeResponse(w, http.StatusNotFound, fmt.Sprintf("Couldn't find schedule %s", name))
+		return
+	}
+	err = st.Update(bson.M{"name": name}, bson.M{"$set": schedule2})
 	if err != nil {
-		writeResponse(w, http.StatusInternalServerError, fmt.Sprintf("Error updating schedule. err=%s", err.Error()))
+		writeResponse(w, http.StatusInternalServerError, "Error updating schedule")
+		logrus.Errorf("Error updating schedule %s. err=%s", name, err)
 		return
 	}
 	prepareTimers()
@@ -160,7 +159,7 @@ func listSchedules(w http.ResponseWriter, r *http.Request) {
 	st := sc.DB(dbName).C("schedules")
 
 	// var schedules []map[string]interface{}
-	var schedules []Schedule
+	schedules := make([]Schedule, 0)
 	err := st.Find(nil).All(&schedules)
 	if err != nil {
 		writeResponse(w, http.StatusInternalServerError, fmt.Sprintf("Error listing schedules. err=%s", err.Error()))
@@ -180,7 +179,7 @@ func listSchedules(w http.ResponseWriter, r *http.Request) {
 
 func getSchedule(w http.ResponseWriter, r *http.Request) {
 	logrus.Debugf("getSchedule r=%v", r)
-	id := r.URL.Query().Get("id")
+	name := mux.Vars(r)["name"]
 
 	sc := mongoSession.Copy()
 	defer sc.Close()
@@ -188,7 +187,7 @@ func getSchedule(w http.ResponseWriter, r *http.Request) {
 
 	// var schedule map[string]interface{}
 	var schedule Schedule
-	err := st.FindId(id).One(&schedule)
+	err := st.Find(bson.M{"name": name}).One(&schedule)
 	if err != nil {
 		writeResponse(w, http.StatusInternalServerError, fmt.Sprintf("Error getting schedule. err=%s", err.Error()))
 		return
@@ -206,19 +205,19 @@ func getSchedule(w http.ResponseWriter, r *http.Request) {
 
 func deleteSchedule(w http.ResponseWriter, r *http.Request) {
 	logrus.Debugf("deleteSchedule r=%v", r)
-	id := r.URL.Query().Get("id")
+	name := mux.Vars(r)["name"]
 
 	sc := mongoSession.Copy()
 	defer sc.Close()
 	st := sc.DB(dbName).C("schedules")
 
-	err := st.RemoveId(id)
+	err := st.Remove(bson.M{"name": name})
 	if err != nil {
 		writeResponse(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting schedule. err=%s", err.Error()))
 		return
 	}
 	prepareTimers()
-	writeResponse(w, http.StatusOK, fmt.Sprintf("Deleted schedule successfully. id=%s", id))
+	writeResponse(w, http.StatusOK, fmt.Sprintf("Deleted schedule successfully. name=%s", name))
 }
 
 func writeResponse(w http.ResponseWriter, statusCode int, message string) {

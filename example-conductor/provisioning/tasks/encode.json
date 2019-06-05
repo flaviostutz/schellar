@@ -1,19 +1,19 @@
 [
     {
         "name": "encode",
-        "retryCount": 3,
+        "retryCount": 0,
 
-        "timeoutSeconds": 360,
+        "timeoutSeconds": 300,
         "inputKeys": [
-            "fileLocation"
+            "param1"
         ],
         "outputKeys": [
-            "encodeLocation"
+            "param1"
         ],
         "timeoutPolicy": "TIME_OUT_WF",
         "retryLogic": "FIXED",
         "retryDelaySeconds": 30,
-        "responseTimeoutSeconds": 120,
+        "responseTimeoutSeconds": 45,
         "concurrentExecLimit": 100,
         "rateLimitFrequencyInSeconds": 60,
         "rateLimitPerFrequency": 50
