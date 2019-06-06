@@ -19,7 +19,7 @@ var (
 	checkIntervalSeconds = 10
 )
 
-//Schedule struct
+//Schedule struct data
 type Schedule struct {
 	Name                string                 `json:"name,omitempty" bson:"name"`
 	Enabled             bool                   `json:"enabled,omitempty" bson:"enabled"`

@@ -214,7 +214,6 @@ func checkRunningWorkflows() {
 					scheduleStatus = wf2["status"].(string)
 					out, exists := wf2["output"]
 					if exists {
-						logrus.Debugf(">>>>>> %s", out)
 						wfoutput = out.(map[string]interface{})
 					}
 				}

@@ -43,7 +43,7 @@ func launchWorkflow(scheduleName string) error {
 		return err
 	}
 	if resp.StatusCode != 200 {
-		logrus.Warnf("POST /workflow call status != 200. resp=%v", resp)
+		logrus.Warnf("POST /workflow call status!=200. resp=%v", resp)
 		return fmt.Errorf("Failed to create new workflow instance. status=%d", resp.StatusCode)
 	}
 	logrus.Infof("Schedule %s: Workflow %s launched. workflowId=%s", schedule.Name, schedule.WorkflowName, string(data))

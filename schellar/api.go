@@ -103,7 +103,7 @@ func createSchedule(w http.ResponseWriter, r *http.Request) {
 	logrus.Debugf("schedule: %v", schedule)
 	err0 := st.Insert(schedule)
 	if err0 != nil {
-		writeResponse(w, http.StatusInternalServerError, "Error storing schedule")
+		writeResponse(w, http.StatusInternalServerError, "Error storing schedule.")
 		logrus.Errorf("Error storing schedule to Mongo. err=%s", err0)
 		return
 	}
