@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/mgo.v2/bson"
 )
 
