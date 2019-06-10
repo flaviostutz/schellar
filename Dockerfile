@@ -1,19 +1,20 @@
-FROM golang:1.10 AS BUILD
+FROM golang:1.12.5-stretch as builder
 
-#doing dependency build separated from source build optimizes time for developer, but is not required
-#install external dependencies first
-ADD /main.dep $GOPATH/src/schellar/main.go
-RUN go get -v schellar
+RUN mkdir /schellar
+WORKDIR /schellar
 
-#now build source code
-ADD schellar $GOPATH/src/schellar
-RUN go get -v schellar
+ADD schellar/go.mod .
+#ADD go.sum .
 
+RUN go mod download
 
+ADD schellar/. .
 
-FROM golang:1.10 AS IMAGE
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o /go/bin/schellar .
 
-COPY --from=BUILD /go/bin/* /bin/
+FROM alpine
+
+COPY --from=builder /go/bin/schellar /bin/
 ADD startup.sh /
 
 ENV CONDUCTOR_API_URL ''
@@ -22,7 +23,4 @@ ENV MONGO_ADDRESS ''
 ENV MONGO_USERNAME ''
 ENV MONGO_PASSWORD ''
 
-CMD [ "/startup.sh" ]
-
-# FROM BUILD AS TEST
-# RUN go test -v schelly
+CMD ["sh","startup.sh"]⏎
