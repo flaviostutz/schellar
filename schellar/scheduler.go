@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/robfig/cron"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/mgo.v2/bson"
 )
 
