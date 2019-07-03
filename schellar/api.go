@@ -148,7 +148,7 @@ func updateSchedule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	prepareTimers()
-	writeResponse(w, http.StatusCreated, fmt.Sprintf("Schedule updated successfully"))
+	writeResponse(w, http.StatusOK, fmt.Sprintf("Schedule updated successfully"))
 }
 
 func listSchedules(w http.ResponseWriter, r *http.Request) {
