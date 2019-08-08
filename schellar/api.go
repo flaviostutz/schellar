@@ -12,7 +12,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
-	mgo "gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -22,11 +22,13 @@ var (
 
 func startRestAPI() error {
 	router := mux.NewRouter()
-	router.HandleFunc("/schedule", createSchedule).Methods("POST")
+
+	router.Use(customCorsMiddleware)
+	router.HandleFunc("/schedule", createSchedule).Methods("POST", "OPTIONS")
 	router.HandleFunc("/schedule", listSchedules).Methods("GET")
 	router.HandleFunc("/schedule/{name}", getSchedule).Methods("GET")
 	router.HandleFunc("/schedule/{name}", deleteSchedule).Methods("DELETE")
-	router.HandleFunc("/schedule/{name}", updateSchedule).Methods("PUT")
+	router.HandleFunc("/schedule/{name}", updateSchedule).Methods("PUT", "OPTIONS")
 	router.Handle("/metrics", promhttp.Handler())
 	listen := fmt.Sprintf("0.0.0.0:3000")
 	logrus.Infof("Listening at %s", listen)
@@ -227,4 +229,16 @@ func writeResponse(w http.ResponseWriter, statusCode int, message string) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(msg)
+}
+
+func customCorsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		if r.Method == http.MethodOptions {
+			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, PUT, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Requested-With")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
