@@ -42,7 +42,6 @@ func main() {
 	mongoAddress0 := flag.String("mongo-address", "", "MongoDB address. Example: 'mongo', or 'mongdb://mongo1:1234/db1,mongo2:1234/db1")
 	mongoUsername0 := flag.String("mongo-username", "root", "MongoDB username")
 	mongoPassword0 := flag.String("mongo-password", "root", "MongoDB password")
-
 	flag.Parse()
 
 	switch *logLevel {
