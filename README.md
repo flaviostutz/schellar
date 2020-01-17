@@ -1,6 +1,9 @@
 # schellar
 Schellar is a scheduler tool for invoking Conductor workflows from time to time
 
+Check another tool that may be helpful:
+* [Backtor](https://github.com/flaviostutz/backtor) is a backup scheduler tool that uses Conductor workers to handle backup operations)
+
 ## Usage
 
 * Checkout this repo 
