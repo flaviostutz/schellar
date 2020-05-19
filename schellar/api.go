@@ -70,9 +70,9 @@ func createSchedule(w http.ResponseWriter, r *http.Request) {
 	if schedule.WorkflowVersion == "" {
 		schedule.WorkflowVersion = "1"
 	}
-	if !schedule.Enabled {
-		schedule.Enabled = true
-	}
+	// if !schedule.Enabled {
+	// 	schedule.Enabled = true
+	// }
 	if schedule.CheckWarningSeconds == 0 {
 		schedule.CheckWarningSeconds = 3600
 	}
