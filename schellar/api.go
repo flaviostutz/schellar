@@ -55,6 +55,10 @@ func createSchedule(w http.ResponseWriter, r *http.Request) {
 		writeResponse(w, http.StatusBadRequest, "'name' is required")
 		return
 	}
+	if strings.Contains(schedule.Name, "/") {
+		writeResponse(w, http.StatusBadRequest, "'name' cannot contain '/' character")
+		return
+	}
 	if schedule.WorkflowName == "" {
 		writeResponse(w, http.StatusBadRequest, "'workflowName' is required")
 		return
