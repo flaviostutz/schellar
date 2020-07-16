@@ -1,4 +1,8 @@
 # schellar
+
+[<img src="https://img.shields.io/docker/pulls/flaviostutz/schellar"/>](https://hub.docker.com/r/flaviostutz/schellar)
+[<img src="https://img.shields.io/docker/automated/flaviostutz/schellar"/>](https://hub.docker.com/r/flaviostutz/schellar)
+
 Schellar is a scheduler tool for invoking Conductor workflows from time to time
 
 Check another tool that may be helpful:
