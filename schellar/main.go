@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+	"github.com/robfig/cron/v3"
 	"github.com/sirupsen/logrus"
 	mgo "gopkg.in/mgo.v2"
 )
@@ -33,6 +35,33 @@ type Schedule struct {
 	FromDate            *time.Time             `json:"fromDate,omitempty" bson:"fromDate"`
 	ToDate              *time.Time             `json:"toDate,omitempty" bson:"toDate"`
 	LastUpdate          time.Time              `json:"lastUpdate,omitempty" bson:"lastUpdate"`
+}
+
+func (schedule Schedule) ValidateAndUpdate() error {
+	if schedule.Name == "" {
+		return errors.New("'name' is required")
+	}
+	if strings.Contains(schedule.Name, "/") {
+		return errors.New("'name' cannot contain '/' character")
+	}
+	if schedule.WorkflowName == "" {
+		return errors.New("'workflowName' is required")
+	}
+	if schedule.CronString == "" {
+		return errors.New("'cronString' is required")
+	}
+	_, err := cron.ParseStandard(schedule.CronString)
+	if err != nil {
+		return errors.Wrap(err, "'cronString' is invalid")
+	}
+	if schedule.WorkflowVersion == "" {
+		schedule.WorkflowVersion = "1"
+	}
+	if schedule.CheckWarningSeconds == 0 {
+		schedule.CheckWarningSeconds = 3600
+	}
+	schedule.LastUpdate = time.Now()
+	return nil
 }
 
 func main() {

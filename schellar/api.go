@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
-	"time"
 
 	"encoding/json"
 
@@ -44,50 +42,17 @@ func createSchedule(w http.ResponseWriter, r *http.Request) {
 	logrus.Debugf("createSchedule r=%v", r)
 
 	decoder := json.NewDecoder(r.Body)
-	// schedule := make(map[string]interface{})
 	var schedule Schedule
 	err := decoder.Decode(&schedule)
 	if err != nil {
 		writeResponse(w, http.StatusBadRequest, fmt.Sprintf("Error handling post results. err=%s", err.Error()))
 		return
 	}
-	if schedule.Name == "" {
-		writeResponse(w, http.StatusBadRequest, "'name' is required")
+	err = schedule.ValidateAndUpdate()
+	if err != nil {
+		writeResponse(w, http.StatusBadRequest, fmt.Sprintf("Error handling post results. err=%s", err.Error()))
 		return
 	}
-	if strings.Contains(schedule.Name, "/") {
-		writeResponse(w, http.StatusBadRequest, "'name' cannot contain '/' character")
-		return
-	}
-	if schedule.WorkflowName == "" {
-		writeResponse(w, http.StatusBadRequest, "'workflowName' is required")
-		return
-	}
-	if schedule.CronString == "" {
-		writeResponse(w, http.StatusBadRequest, "'cronString' is required")
-		return
-	}
-	if len(strings.Split(schedule.CronString, " ")) != 6 {
-		writeResponse(w, http.StatusBadRequest, "'cronString' is invalid. It must have 5 spaces")
-		return
-	}
-	if schedule.WorkflowVersion == "" {
-		schedule.WorkflowVersion = "1"
-	}
-	// if !schedule.Enabled {
-	// 	schedule.Enabled = true
-	// }
-	if schedule.CheckWarningSeconds == 0 {
-		schedule.CheckWarningSeconds = 3600
-	}
-	schedule.LastUpdate = time.Now()
-
-	// _, err1 := getWorkflow(schedule.WorkflowName, schedule.WorkflowVersion)
-	// if err1 != nil {
-	// 	writeResponse(w, http.StatusBadRequest, fmt.Sprintf("Workflow '%s' %s doesn't exist in Conductor", schedule.WorkflowName, schedule.WorkflowVersion))
-	// 	return
-	// }
-	// logrus.Debugf("Workflow %s exists in Conductor", schedule.WorkflowName)
 
 	sc := mongoSession.Copy()
 	defer sc.Close()
@@ -125,10 +90,16 @@ func updateSchedule(w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
 	decoder := json.NewDecoder(r.Body)
-	schedule2 := make(map[string]interface{})
-	err := decoder.Decode(&schedule2)
+
+	var schedule Schedule
+	err := decoder.Decode(&schedule)
 	if err != nil {
-		writeResponse(w, http.StatusBadRequest, fmt.Sprintf("Error updating schedule. err=%s", err.Error()))
+		writeResponse(w, http.StatusBadRequest, fmt.Sprintf("Error handling post results. err=%s", err.Error()))
+		return
+	}
+	err = schedule.ValidateAndUpdate()
+	if err != nil {
+		writeResponse(w, http.StatusBadRequest, fmt.Sprintf("Error handling post results. err=%s", err.Error()))
 		return
 	}
 
@@ -136,7 +107,7 @@ func updateSchedule(w http.ResponseWriter, r *http.Request) {
 	defer sc.Close()
 	st := sc.DB(dbName).C("schedules")
 
-	logrus.Debugf("Updating schedule with %v", schedule2)
+	logrus.Debugf("Updating schedule with %v", schedule)
 	c, err1 := st.Find(bson.M{"name": name}).Count()
 	if err1 != nil {
 		writeResponse(w, http.StatusInternalServerError, fmt.Sprintf("Error updating schedule"))
@@ -147,7 +118,7 @@ func updateSchedule(w http.ResponseWriter, r *http.Request) {
 		writeResponse(w, http.StatusNotFound, fmt.Sprintf("Couldn't find schedule %s", name))
 		return
 	}
-	err = st.Update(bson.M{"name": name}, bson.M{"$set": schedule2})
+	err = st.Update(bson.M{"name": name}, bson.M{"$set": schedule})
 	if err != nil {
 		writeResponse(w, http.StatusInternalServerError, "Error updating schedule")
 		logrus.Errorf("Error updating schedule %s. err=%s", name, err)
